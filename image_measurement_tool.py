@@ -130,7 +130,7 @@ class MeasurementWindow(QMainWindow):
             "- Mouse Wheel: Zoom\n"
             "- Space + Drag: Pan\n"
             "- Left Click: Select points (depends on active mode)\n"
-            "- Right Click: Cancel current selection / finish tracing\n"
+            "- Right Click: Remove a traced point\n"
             "- Esc: Cancel current mode\n"
             "- 'Set Units' button: Choose the unit label for measurements\n"
         )
@@ -167,6 +167,7 @@ class MeasurementWindow(QMainWindow):
         self.scale_markers: List[QGraphicsEllipseItem] = []
         self.scale_line: Optional[QGraphicsLineItem] = None
         self.path_points: List[QPointF] = []
+        self.path_markers: List[QGraphicsEllipseItem] = []
         self.path_item: Optional[QGraphicsPathItem] = None
         self.units_per_pixel: Optional[float] = None
         self.unit_name: str = "units"
@@ -196,8 +197,11 @@ class MeasurementWindow(QMainWindow):
                     self.handle_trace_click(scene_pos)
                     return True
             elif event.type() == QEvent.MouseButtonPress and event.button() == Qt.RightButton:
-                if self.mode in {"scale_first", "scale_second", "trace"}:
+                scene_pos = self.view.mapToScene(event.pos())
+                if self.mode in {"scale_first", "scale_second"}:
                     self.cancel_mode()
+                    return True
+                if self.remove_path_point_at(scene_pos):
                     return True
             elif event.type() == QEvent.KeyPress and event.key() == Qt.Key_Escape:
                 if self.mode != "idle":
@@ -292,11 +296,14 @@ class MeasurementWindow(QMainWindow):
                 return
         self.mode = "trace"
         self.path_points = []
+        self.remove_path_markers()
         self.remove_path_item()
-        self.status_label.setText("Click to add points to the path. Right-click or press Esc to finish.")
+        self.status_label.setText("Click to add points. Right-click a marker to remove it, or press Esc to cancel.")
 
     def handle_trace_click(self, point: QPointF):
         self.path_points.append(point)
+        marker = self.add_path_marker(point)
+        self.path_markers.append(marker)
         self.update_path_item()
         self.update_distance_label()
 
@@ -309,6 +316,7 @@ class MeasurementWindow(QMainWindow):
             item = QGraphicsPathItem(path)
             pen = QPen(self.PATH_COLOR, 2)
             item.setPen(pen)
+            item.setZValue(0)
             self.path_item = item
             self.scene.addItem(item)
 
@@ -330,6 +338,7 @@ class MeasurementWindow(QMainWindow):
 
     def clear_path(self):
         self.path_points = []
+        self.remove_path_markers()
         self.remove_path_item()
         self.update_distance_label()
         self.status_label.setText("Path cleared. Trace again or set a new scale if desired.")
@@ -362,13 +371,47 @@ class MeasurementWindow(QMainWindow):
             self.scene.removeItem(self.path_item)
             self.path_item = None
 
+    def remove_path_markers(self):
+        for marker in self.path_markers:
+            self.scene.removeItem(marker)
+        self.path_markers = []
+
     def add_marker(self, point: QPointF) -> QGraphicsEllipseItem:
         radius = 5
         ellipse = QGraphicsEllipseItem(point.x() - radius, point.y() - radius, radius * 2, radius * 2)
         ellipse.setBrush(QBrush(self.SCALE_POINT_COLOR))
         ellipse.setPen(QPen(Qt.black))
+        ellipse.setZValue(2)
         self.scene.addItem(ellipse)
         return ellipse
+
+    def add_path_marker(self, point: QPointF) -> QGraphicsEllipseItem:
+        radius = 4
+        ellipse = QGraphicsEllipseItem(point.x() - radius, point.y() - radius, radius * 2, radius * 2)
+        ellipse.setBrush(QBrush(self.PATH_COLOR))
+        ellipse.setPen(QPen(Qt.black))
+        ellipse.setZValue(1)
+        self.scene.addItem(ellipse)
+        return ellipse
+
+    def remove_path_point_at(self, scene_pos: QPointF) -> bool:
+        index = self.find_path_point_index(scene_pos)
+        if index is None:
+            return False
+        marker = self.path_markers.pop(index)
+        self.scene.removeItem(marker)
+        self.path_points.pop(index)
+        self.update_path_item()
+        self.update_distance_label()
+        self.status_label.setText("Trace point removed.")
+        return True
+
+    def find_path_point_index(self, scene_pos: QPointF) -> Optional[int]:
+        for idx, marker in enumerate(self.path_markers):
+            local_pos = marker.mapFromScene(scene_pos)
+            if marker.contains(local_pos):
+                return idx
+        return None
 
     def set_units(self):
         text, ok = QInputDialog.getText(
