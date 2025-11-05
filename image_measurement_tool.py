@@ -78,6 +78,10 @@ class ZoomableGraphicsView(QGraphicsView):
             self.setCursor(Qt.ArrowCursor)
         super().mouseReleaseEvent(event)
 
+    def is_panning_active(self) -> bool:
+        """Return True while the user holds space to pan the view."""
+        return self._space_pressed
+
 
 class MeasurementScene(QGraphicsScene):
     def __init__(self, parent=None):
@@ -118,6 +122,8 @@ class MeasurementWindow(QMainWindow):
         self.trace_button.clicked.connect(self.start_path_tracing)
         self.clear_button = QPushButton("Clear Path")
         self.clear_button.clicked.connect(self.clear_path)
+        self.unit_button = QPushButton("Set Units")
+        self.unit_button.clicked.connect(self.set_units)
 
         controls_text = (
             "Controls:\n"
@@ -126,6 +132,7 @@ class MeasurementWindow(QMainWindow):
             "- Left Click: Select points (depends on active mode)\n"
             "- Right Click: Cancel current selection / finish tracing\n"
             "- Esc: Cancel current mode\n"
+            "- 'Set Units' button: Choose the unit label for measurements\n"
         )
         self.control_overview = QTextEdit()
         self.control_overview.setReadOnly(True)
@@ -136,6 +143,7 @@ class MeasurementWindow(QMainWindow):
         button_row.addWidget(self.scale_button)
         button_row.addWidget(self.trace_button)
         button_row.addWidget(self.clear_button)
+        button_row.addWidget(self.unit_button)
         button_row.addStretch()
         button_row.addWidget(self.total_label)
 
@@ -161,6 +169,7 @@ class MeasurementWindow(QMainWindow):
         self.path_points: List[QPointF] = []
         self.path_item: Optional[QGraphicsPathItem] = None
         self.units_per_pixel: Optional[float] = None
+        self.unit_name: str = "units"
 
         self.view.viewport().installEventFilter(self)
 
@@ -174,6 +183,8 @@ class MeasurementWindow(QMainWindow):
     def eventFilter(self, obj, event):
         if obj is self.view.viewport():
             if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+                if self.view.is_panning_active():
+                    return False
                 scene_pos = self.view.mapToScene(event.pos())
                 if self.mode == "scale_first":
                     self.handle_scale_first_click(scene_pos)
@@ -243,8 +254,9 @@ class MeasurementWindow(QMainWindow):
                 self.draw_scale_line()
                 self.mode = "idle"
                 self.status_label.setText(
-                    f"Scale set: {value:.4f} units over {distance_pixels:.2f} pixels. Trace a path to measure."
+                    f"Scale set: {value:.4f} {self.unit_name} over {distance_pixels:.2f} pixels. Trace a path to measure."
                 )
+                self.update_distance_label()
             else:
                 QMessageBox.information(self, "Scale cancelled", "Scale input was cancelled.")
                 self.reset_scale_items()
@@ -302,14 +314,17 @@ class MeasurementWindow(QMainWindow):
 
     def update_distance_label(self):
         if len(self.path_points) < 2:
-            self.total_label.setText("Distance: 0")
+            if self.units_per_pixel is not None:
+                self.total_label.setText(f"Distance: 0 {self.unit_name}")
+            else:
+                self.total_label.setText("Distance: 0 (pixels)")
             return
         total_pixels = 0.0
         for start, end in zip(self.path_points[:-1], self.path_points[1:]):
             total_pixels += self.distance(start, end)
         if self.units_per_pixel is not None:
             total_units = total_pixels * self.units_per_pixel
-            self.total_label.setText(f"Distance: {total_units:.4f} (units)")
+            self.total_label.setText(f"Distance: {total_units:.4f} {self.unit_name}")
         else:
             self.total_label.setText(f"Distance: {total_pixels:.2f} (pixels)")
 
@@ -354,6 +369,20 @@ class MeasurementWindow(QMainWindow):
         ellipse.setPen(QPen(Qt.black))
         self.scene.addItem(ellipse)
         return ellipse
+
+    def set_units(self):
+        text, ok = QInputDialog.getText(
+            self,
+            "Set measurement units",
+            "Enter the unit label for measurements (e.g., meters, inches):",
+            text=self.unit_name,
+        )
+        if not ok:
+            return
+        unit = text.strip() or "units"
+        self.unit_name = unit
+        self.status_label.setText(f"Measurement units set to '{self.unit_name}'.")
+        self.update_distance_label()
 
     @staticmethod
     def distance(start: QPointF, end: QPointF) -> float:
