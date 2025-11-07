@@ -153,7 +153,7 @@ def upload_panel() -> rx.Component:
     return rx.responsive_grid(
         setup_card,
         results_card,
-        columns=[1, 2, 2],
+        columns=[1, 1, 1],
         spacing="4",
         width="100%",
     )
