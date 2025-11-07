@@ -14,9 +14,7 @@ UNIT_CHOICES = [
 ]
 
 
-def upload_panel() -> rx.Component:
-    """Panel containing image upload and measurement controls."""
-
+def _setup_card() -> rx.Component:
     uploader = rx.upload(  # type: ignore[no-untyped-call]
         rx.vstack(
             rx.icon("cloud-upload", font_size="2em"),
@@ -120,5 +118,35 @@ def upload_panel() -> rx.Component:
             spacing="4",
             width="100%",
         ),
+        width="100%",
+    )
+
+
+def _results_card() -> rx.Component:
+    return rx.card(
+        rx.vstack(
+            rx.heading("Results", size="md"),
+            rx.form_control(
+                rx.form_label("Measured distance"),
+                rx.input(
+                    value=MeasurementState.measured_distance_display,
+                    is_read_only=True,
+                    variant="filled",
+                ),
+            ),
+            spacing="4",
+            width="100%",
+        ),
+        width="100%",
+    )
+
+
+def upload_panel() -> rx.Component:
+    """Panel containing image upload, measurement controls, and results."""
+
+    return rx.vstack(
+        _setup_card(),
+        _results_card(),
+        spacing="4",
         width="100%",
     )
