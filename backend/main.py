@@ -22,7 +22,7 @@ def main() -> None:
     """Run the API using uvicorn."""
 
     _ensure_project_root_on_path()
-    host = os.environ.get("HOST", "0.0.0.0")
+    host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8000"))
     reload = os.environ.get("UVICORN_RELOAD", "0") == "1"
     uvicorn.run("backend.api:app", host=host, port=port, reload=reload)
