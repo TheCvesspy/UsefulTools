@@ -94,7 +94,8 @@ body {
 
 input[type="file"],
 select,
-input[type="number"] {
+input[type="number"],
+input[type="text"] {
   padding: 0.65rem 0.75rem;
   border-radius: 0.75rem;
   border: 1px solid rgba(148, 163, 184, 0.5);
@@ -103,7 +104,8 @@ input[type="number"] {
 
 input[type="number"]:focus,
 select:focus,
-input[type="file"]:focus {
+input[type="file"]:focus,
+input[type="text"]:focus {
   outline: 2px solid rgba(59, 130, 246, 0.35);
   border-color: rgba(59, 130, 246, 0.6);
 }
@@ -176,26 +178,19 @@ button:not(:disabled):hover {
   color: #dc2626;
 }
 
-.measurement-total-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 1rem 1.25rem;
-  border-radius: 1rem;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(59, 130, 246, 0.18));
+.measurement-total-group {
+  margin-bottom: 0;
+}
+
+.measurement-output {
+  background: rgba(148, 163, 184, 0.12);
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: #0f172a;
 }
 
-.measurement-label {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #1e3a8a;
-}
-
-.measurement-value {
-  font-size: 1.5rem;
-  font-weight: 700;
+.measurement-output[readonly] {
+  cursor: default;
 }
 
 .hint {

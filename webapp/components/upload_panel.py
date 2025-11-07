@@ -125,34 +125,26 @@ def upload_panel() -> rx.Component:
                     spacing="2",
                     align_items="center",
                 ),
-                rx.cond(
-                    MeasurementState.measurement_error,
-                    rx.alert(
-                        rx.alert_icon(),
-                        rx.alert_title("Measurement error"),
-                        rx.alert_description(MeasurementState.measurement_error),
-                        status="error",
-                    ),
-                    rx.vstack(
-                        rx.text(
-                            "Measurement total",
-                            font_size="sm",
-                            color="gray.500",
-                            text_transform="uppercase",
-                            letter_spacing="wider",
-                        ),
-                        rx.text(
-                            MeasurementState.formatted_total,
-                            font_size="lg",
-                            font_weight="bold",
-                        ),
-                        spacing="1",
-                        align_items="flex-start",
-                    ),
+            ),
+            rx.cond(
+                MeasurementState.measurement_error,
+                rx.alert(
+                    rx.alert_icon(),
+                    rx.alert_title("Measurement error"),
+                    rx.alert_description(MeasurementState.measurement_error),
+                    status="error",
+                ),
+            ),
+            rx.form_control(
+                rx.form_label("Measured distance"),
+                rx.input(
+                    value=MeasurementState.formatted_total,
+                    is_read_only=True,
+                    width="100%",
                 ),
             ),
             spacing="3",
-            align_items="flex-start",
+            align_items="stretch",
             width="100%",
         ),
         width="100%",

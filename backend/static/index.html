@@ -76,9 +76,15 @@
           <h2>Results</h2>
           <div id="measurement-status" class="status-message" aria-live="polite"></div>
           <div id="measurement-error" class="status-message error" role="alert"></div>
-          <div class="measurement-total-card" aria-live="polite">
-            <span class="measurement-label">Measurement total</span>
-            <span id="measurement-total" class="measurement-value">Distance: 0.00 px</span>
+          <div class="form-group measurement-total-group" aria-live="polite">
+            <label for="measurement-total" class="form-label">Measured distance</label>
+            <input
+              type="text"
+              id="measurement-total"
+              class="measurement-output"
+              value="0.00 px"
+              readonly
+            />
           </div>
         </div>
       </section>

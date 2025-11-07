@@ -329,11 +329,11 @@ class MeasurementState(rx.State):
             )
             total_units = measurement.get("total_units")
             if isinstance(total_units, (int, float)):
-                return f"Distance: {float(total_units):.2f} {display_unit}"
+                return f"{float(total_units):.2f} {display_unit}"
             total_pixels = measurement.get("total_pixels")
             if isinstance(total_pixels, (int, float)):
-                return f"Distance: {float(total_pixels):.2f} px"
-        return f"Distance: {self.total_distance:.2f} {self.unit_name}"
+                return f"{float(total_pixels):.2f} px"
+        return f"{self.total_distance:.2f} {self.unit_name}"
 
     @rx.var
     def scale_length(self) -> float:
