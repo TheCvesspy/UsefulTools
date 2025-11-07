@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import reflex as rx
 
+from ...core import app_shell
 from ..components import measurement_canvas, status_bar, upload_panel
-from ..state import MeasurementState
 
 
-def index() -> rx.Component:
-    """Main application page."""
+def tool() -> rx.Component:
+    """Main distance measurement feature page."""
 
     content = rx.vstack(
         rx.heading("Image Distance Measurement", size="lg"),
@@ -27,19 +27,4 @@ def index() -> rx.Component:
         width="100%",
     )
 
-    return rx.box(
-        rx.container(content, max_width="6xl"),
-        width="100%",
-        min_height="100vh",
-        padding_y="8",
-        background=rx.cond(
-            MeasurementState.dark_mode,
-            "gray.900",
-            "gray.100",
-        ),
-        color=rx.cond(
-            MeasurementState.dark_mode,
-            "gray.100",
-            "gray.800",
-        ),
-    )
+    return app_shell(content, max_width="6xl")
