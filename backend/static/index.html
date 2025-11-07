@@ -16,60 +16,70 @@
 
     <main class="app-layout">
       <section class="panel">
-        <h2>Setup</h2>
-        <div class="form-group">
-          <label for="file-input" class="form-label">Image file</label>
-          <input type="file" id="file-input" accept="image/*" />
+        <div class="panel-section">
+          <h2>Setup</h2>
+          <div class="form-group">
+            <label for="file-input" class="form-label">Image file</label>
+            <input type="file" id="file-input" accept="image/*" />
+          </div>
+          <div class="button-row">
+            <button id="upload-button" class="primary">Upload image</button>
+            <span id="upload-status" class="status-message"></span>
+          </div>
+          <div id="upload-error" class="status-message error" role="alert"></div>
+
+          <div class="form-group">
+            <label for="unit-select" class="form-label">Units</label>
+            <select id="unit-select">
+              <option value="px">Pixels</option>
+              <option value="mm">Millimetres</option>
+              <option value="cm">Centimetres</option>
+              <option value="km">Kilometres</option>
+              <option value="mi">Miles</option>
+            </select>
+          </div>
+
+          <div id="scale-info" class="hint"></div>
+
+          <div class="form-group">
+            <label for="scale-distance" class="form-label">Scale measurement</label>
+            <input
+              type="number"
+              id="scale-distance"
+              min="0"
+              step="0.1"
+              placeholder="Real-world distance"
+            />
+            <p class="helper">
+              Enter the real-world distance between the two selected scale points.
+            </p>
+          </div>
+
+          <div class="form-group">
+            <label for="units-per-pixel" class="form-label">Units per pixel</label>
+            <input
+              type="number"
+              id="units-per-pixel"
+              min="0"
+              step="0.0001"
+              placeholder="Units per pixel"
+            />
+            <p class="helper">Adjust this value to fine-tune measurements.</p>
+          </div>
+
+          <div class="button-row">
+            <button id="reset-button" class="ghost">Reset</button>
+          </div>
         </div>
-        <div class="button-row">
-          <button id="upload-button" class="primary">Upload image</button>
-          <span id="upload-status" class="status-message"></span>
-        </div>
-        <div id="upload-error" class="status-message error" role="alert"></div>
 
-        <div class="form-group">
-          <label for="unit-select" class="form-label">Units</label>
-          <select id="unit-select">
-            <option value="px">Pixels</option>
-            <option value="mm">Millimetres</option>
-            <option value="cm">Centimetres</option>
-            <option value="km">Kilometres</option>
-            <option value="mi">Miles</option>
-          </select>
-        </div>
-
-        <div id="scale-info" class="hint"></div>
-
-        <div class="form-group">
-          <label for="scale-distance" class="form-label">Scale measurement</label>
-          <input
-            type="number"
-            id="scale-distance"
-            min="0"
-            step="0.1"
-            placeholder="Real-world distance"
-          />
-          <p class="helper">
-            Enter the real-world distance between the two selected scale points.
-          </p>
-        </div>
-
-        <div class="form-group">
-          <label for="units-per-pixel" class="form-label">Units per pixel</label>
-          <input
-            type="number"
-            id="units-per-pixel"
-            min="0"
-            step="0.0001"
-            placeholder="Units per pixel"
-          />
-          <p class="helper">Adjust this value to fine-tune measurements.</p>
-        </div>
-
-        <div id="measurement-error" class="status-message error" role="alert"></div>
-
-        <div class="button-row">
-          <button id="reset-button" class="ghost">Reset</button>
+        <div class="panel-section results-section">
+          <h2>Results</h2>
+          <div id="measurement-status" class="status-message" aria-live="polite"></div>
+          <div id="measurement-error" class="status-message error" role="alert"></div>
+          <div class="measurement-total-card" aria-live="polite">
+            <span class="measurement-label">Measurement total</span>
+            <span id="measurement-total" class="measurement-value">Distance: 0.00 px</span>
+          </div>
         </div>
       </section>
 
@@ -89,13 +99,11 @@
           <button id="end-button" class="ghost">End Mode</button>
         </div>
 
-        <div id="measurement-status" class="status-message"></div>
       </section>
     </main>
 
     <footer class="status-bar">
       <div id="instructions">Load an image to begin.</div>
-      <div id="measurement-total">Distance: 0.00 px</div>
     </footer>
 
     <script src="/static/app.js" type="module"></script>

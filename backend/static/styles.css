@@ -53,10 +53,32 @@ body {
   box-shadow: 0 24px 45px -24px rgba(15, 23, 42, 0.4);
 }
 
-.panel h2 {
-  margin-top: 0;
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.results-section {
+  gap: 0.75rem;
+}
+
+.panel-section h2 {
+  margin: 0 0 1rem;
   font-size: 1.25rem;
   color: #0f172a;
+}
+
+.panel-section + .panel-section {
+  border-top: 1px solid rgba(148, 163, 184, 0.35);
+  padding-top: 1.5rem;
+  margin-top: -0.25rem;
 }
 
 .form-group {
@@ -137,8 +159,43 @@ button:not(:disabled):hover {
   min-height: 1.2rem;
 }
 
+.status-message.loading::before {
+  content: "";
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  border: 2px solid rgba(59, 130, 246, 0.4);
+  border-top-color: rgba(59, 130, 246, 0.95);
+  margin-right: 0.5rem;
+  animation: spin 0.75s linear infinite;
+  vertical-align: middle;
+}
+
 .status-message.error {
   color: #dc2626;
+}
+
+.measurement-total-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem 1.25rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(59, 130, 246, 0.18));
+  color: #0f172a;
+}
+
+.measurement-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #1e3a8a;
+}
+
+.measurement-value {
+  font-size: 1.5rem;
+  font-weight: 700;
 }
 
 .hint {
@@ -212,10 +269,23 @@ button:not(:disabled):hover {
   flex-wrap: wrap;
 }
 
+.status-bar #instructions {
+  font-size: 0.95rem;
+}
+
 @media (max-width: 768px) {
   .status-bar {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }

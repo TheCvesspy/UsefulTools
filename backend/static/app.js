@@ -153,6 +153,7 @@ function updateUI() {
 
   elements.instructions.textContent = state.instructions;
   elements.measurementTotal.textContent = formatDistance();
+  elements.measurementStatus.classList.toggle("loading", state.measuring);
 
   elements.scaleButton.classList.toggle("active", state.mode === "scale");
   elements.pathButton.classList.toggle("active", state.mode === "path");
