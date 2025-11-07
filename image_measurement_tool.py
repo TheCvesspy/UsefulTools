@@ -102,6 +102,13 @@ class MeasurementScene(QGraphicsScene):
 class MeasurementWindow(QMainWindow):
     SCALE_POINT_COLOR = Qt.red
     PATH_COLOR = Qt.green
+    UNIT_CHOICES = [
+        ("px", "px"),
+        ("mm", "mm"),
+        ("cm", "cm"),
+        ("km", "km"),
+        ("mi", "miles (mi)"),
+    ]
 
     def __init__(self):
         super().__init__()
@@ -114,12 +121,14 @@ class MeasurementWindow(QMainWindow):
         self.view.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
 
         self.status_label = QLabel("Load an image to get started.")
-        self.total_label = QLabel("Distance: 0")
+        self.total_label = QLabel("Distance: 0 px")
 
         self.scale_button = QPushButton("Set Scale")
         self.scale_button.clicked.connect(self.start_scale_selection)
         self.trace_button = QPushButton("Trace Path")
         self.trace_button.clicked.connect(self.start_path_tracing)
+        self.close_button = QPushButton("Close Path")
+        self.close_button.clicked.connect(self.close_path_loop)
         self.clear_button = QPushButton("Clear Path")
         self.clear_button.clicked.connect(self.clear_path)
         self.unit_button = QPushButton("Set Units")
@@ -132,7 +141,8 @@ class MeasurementWindow(QMainWindow):
             "- Left Click: Select points (depends on active mode)\n"
             "- Right Click: Remove a traced point\n"
             "- Esc: Cancel current mode\n"
-            "- 'Set Units' button: Choose the unit label for measurements\n"
+            "- 'Close Path' button: Close the traced path into a loop\n"
+            "- 'Set Units' button: Choose the unit label (px, mm, cm, km, miles (mi))\n"
         )
         self.control_overview = QTextEdit()
         self.control_overview.setReadOnly(True)
@@ -142,6 +152,7 @@ class MeasurementWindow(QMainWindow):
         button_row = QHBoxLayout()
         button_row.addWidget(self.scale_button)
         button_row.addWidget(self.trace_button)
+        button_row.addWidget(self.close_button)
         button_row.addWidget(self.clear_button)
         button_row.addWidget(self.unit_button)
         button_row.addStretch()
@@ -169,8 +180,9 @@ class MeasurementWindow(QMainWindow):
         self.path_points: List[QPointF] = []
         self.path_markers: List[QGraphicsEllipseItem] = []
         self.path_item: Optional[QGraphicsPathItem] = None
+        self.path_closed: bool = False
         self.units_per_pixel: Optional[float] = None
-        self.unit_name: str = "units"
+        self.unit_name: str = "px"
 
         self.view.viewport().installEventFilter(self)
 
@@ -258,7 +270,7 @@ class MeasurementWindow(QMainWindow):
                 self.draw_scale_line()
                 self.mode = "idle"
                 self.status_label.setText(
-                    f"Scale set: {value:.4f} {self.unit_name} over {distance_pixels:.2f} pixels. Trace a path to measure."
+                    f"Scale set: {value:.4f} {self.unit_choice_label()} over {distance_pixels:.2f} pixels. Trace a path to measure."
                 )
                 self.update_distance_label()
             else:
@@ -286,7 +298,7 @@ class MeasurementWindow(QMainWindow):
         if not self.scene.background_item:
             QMessageBox.information(self, "No image", "Load an image before tracing a path.")
             return
-        if self.units_per_pixel is None:
+        if self.units_per_pixel is None and self.unit_name != "px":
             reply = QMessageBox.question(
                 self,
                 "No scale set",
@@ -298,9 +310,17 @@ class MeasurementWindow(QMainWindow):
         self.path_points = []
         self.remove_path_markers()
         self.remove_path_item()
+        self.path_closed = False
         self.status_label.setText("Click to add points. Right-click a marker to remove it, or press Esc to cancel.")
 
     def handle_trace_click(self, point: QPointF):
+        if self.path_closed:
+            QMessageBox.information(
+                self,
+                "Path already closed",
+                "The path is closed. Clear the path or remove a point to trace again.",
+            )
+            return
         self.path_points.append(point)
         marker = self.add_path_marker(point)
         self.path_markers.append(marker)
@@ -313,33 +333,72 @@ class MeasurementWindow(QMainWindow):
             path = QPainterPath(self.path_points[0])
             for pt in self.path_points[1:]:
                 path.lineTo(pt)
+            if self.path_closed and len(self.path_points) >= 3:
+                path.closeSubpath()
             item = QGraphicsPathItem(path)
             pen = QPen(self.PATH_COLOR, 2)
             item.setPen(pen)
+            if self.path_closed and len(self.path_points) >= 3:
+                brush = QBrush(self.PATH_COLOR)
+                brush.setStyle(Qt.Dense4Pattern)
+                item.setBrush(brush)
             item.setZValue(0)
             self.path_item = item
             self.scene.addItem(item)
 
     def update_distance_label(self):
         if len(self.path_points) < 2:
-            if self.units_per_pixel is not None:
-                self.total_label.setText(f"Distance: 0 {self.unit_name}")
+            if self.unit_name == "px" or self.units_per_pixel is not None:
+                label_unit = self.display_unit_name()
+                self.total_label.setText(f"Distance: 0 {label_unit}")
             else:
-                self.total_label.setText("Distance: 0 (pixels)")
+                self.total_label.setText(
+                    "Distance: 0 px (set scale to convert to selected units)"
+                )
             return
         total_pixels = 0.0
         for start, end in zip(self.path_points[:-1], self.path_points[1:]):
             total_pixels += self.distance(start, end)
-        if self.units_per_pixel is not None:
-            total_units = total_pixels * self.units_per_pixel
-            self.total_label.setText(f"Distance: {total_units:.4f} {self.unit_name}")
+        if self.path_closed and len(self.path_points) >= 3:
+            total_pixels += self.distance(self.path_points[-1], self.path_points[0])
+            area_pixels = self.polygon_area(self.path_points)
         else:
-            self.total_label.setText(f"Distance: {total_pixels:.2f} (pixels)")
+            area_pixels = 0.0
+
+        unit_multiplier = self.get_unit_multiplier()
+        if unit_multiplier is not None:
+            total_units = total_pixels * unit_multiplier
+            distance_text = f"{total_units:.4f} {self.display_unit_name()}"
+            area_text = ""
+            if self.unit_name == "mi":
+                km_value = total_units * 1.60934
+                distance_text += f" ({km_value:.4f} km)"
+            if self.path_closed and len(self.path_points) >= 3:
+                area_units = area_pixels * (unit_multiplier ** 2)
+                area_unit_label = f"{self.display_unit_name()}²"
+                area_text = f" | Area: {area_units:.4f} {area_unit_label}"
+                if self.unit_name == "mi":
+                    km_area = area_units * (1.60934 ** 2)
+                    area_text += f" ({km_area:.4f} km²)"
+            prefix = "Perimeter" if self.path_closed and len(self.path_points) >= 3 else "Distance"
+            self.total_label.setText(f"{prefix}: {distance_text}{area_text}")
+        else:
+            distance_text = f"{total_pixels:.2f} px"
+            if self.unit_name != "px":
+                distance_text += f" (set scale for {self.display_unit_name()})"
+            if self.path_closed and len(self.path_points) >= 3:
+                area_text = f" | Area: {area_pixels:.2f} px²"
+                if self.unit_name != "px":
+                    area_text += f" (set scale for {self.display_unit_name()}²)"
+                self.total_label.setText(f"Perimeter: {distance_text}{area_text}")
+            else:
+                self.total_label.setText(f"Distance: {distance_text}")
 
     def clear_path(self):
         self.path_points = []
         self.remove_path_markers()
         self.remove_path_item()
+        self.path_closed = False
         self.update_distance_label()
         self.status_label.setText("Path cleared. Trace again or set a new scale if desired.")
 
@@ -401,6 +460,7 @@ class MeasurementWindow(QMainWindow):
         marker = self.path_markers.pop(index)
         self.scene.removeItem(marker)
         self.path_points.pop(index)
+        self.path_closed = False
         self.update_path_item()
         self.update_distance_label()
         self.status_label.setText("Trace point removed.")
@@ -414,22 +474,74 @@ class MeasurementWindow(QMainWindow):
         return None
 
     def set_units(self):
-        text, ok = QInputDialog.getText(
+        options = [display for _, display in self.UNIT_CHOICES]
+        current_index = 0
+        for idx, (value, _) in enumerate(self.UNIT_CHOICES):
+            if value == self.unit_name:
+                current_index = idx
+                break
+        selection, ok = QInputDialog.getItem(
             self,
             "Set measurement units",
-            "Enter the unit label for measurements (e.g., meters, inches):",
-            text=self.unit_name,
+            "Choose the measurement unit:",
+            options,
+            current_index,
+            False,
         )
         if not ok:
             return
-        unit = text.strip() or "units"
-        self.unit_name = unit
-        self.status_label.setText(f"Measurement units set to '{self.unit_name}'.")
+        for value, display in self.UNIT_CHOICES:
+            if display == selection:
+                self.unit_name = value
+                break
+        self.status_label.setText(f"Measurement units set to '{self.unit_choice_label()}'.")
         self.update_distance_label()
 
     @staticmethod
     def distance(start: QPointF, end: QPointF) -> float:
         return math.hypot(start.x() - end.x(), start.y() - end.y())
+
+    @staticmethod
+    def polygon_area(points: List[QPointF]) -> float:
+        if len(points) < 3:
+            return 0.0
+        area = 0.0
+        for idx, point in enumerate(points):
+            next_point = points[(idx + 1) % len(points)]
+            area += point.x() * next_point.y()
+            area -= next_point.x() * point.y()
+        return abs(area) / 2.0
+
+    def close_path_loop(self):
+        if len(self.path_points) < 3:
+            QMessageBox.information(
+                self,
+                "Not enough points",
+                "At least three points are required to close the path.",
+            )
+            return
+        if self.path_closed:
+            QMessageBox.information(self, "Path already closed", "The path is already closed.")
+            return
+        self.path_closed = True
+        self.update_path_item()
+        self.update_distance_label()
+        self.status_label.setText("Path closed. Perimeter and area calculated.")
+
+    def get_unit_multiplier(self) -> Optional[float]:
+        if self.unit_name == "px":
+            return 1.0
+        return self.units_per_pixel
+
+    def display_unit_name(self) -> str:
+        return "mi" if self.unit_name == "mi" else self.unit_name
+
+    def unit_choice_label(self, value: Optional[str] = None) -> str:
+        value = value or self.unit_name
+        for unit_value, display in self.UNIT_CHOICES:
+            if unit_value == value:
+                return display
+        return value
 
 
 def main():
