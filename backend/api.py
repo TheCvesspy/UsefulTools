@@ -8,16 +8,21 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
 from .geometry import can_close_loop, compute_measurements
 from .persistence import SessionStore
 
-UPLOAD_DIR = Path(__file__).resolve().parent / "uploads"
+BASE_DIR = Path(__file__).resolve().parent
+FRONTEND_DIR = BASE_DIR / "static"
+INDEX_FILE = FRONTEND_DIR / "index.html"
+
+UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-STORE_PATH = Path(__file__).resolve().parent / "data" / "sessions.json"
+STORE_PATH = BASE_DIR / "data" / "sessions.json"
 _session_store = SessionStore(STORE_PATH)
 
 
@@ -93,6 +98,8 @@ app.add_middleware(
 )
 
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+if FRONTEND_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
 
 @app.post("/upload")
@@ -145,3 +152,10 @@ def get_session(session_id: str, store: SessionStore = Depends(get_store)) -> di
 @app.get("/sessions")
 def list_sessions(store: SessionStore = Depends(get_store)) -> dict:
     return {"sessions": store.list_sessions()}
+
+
+@app.get("/", response_class=HTMLResponse)
+def frontend_index() -> HTMLResponse:
+    if not INDEX_FILE.exists():
+        raise HTTPException(status_code=500, detail="Frontend assets are missing.")
+    return HTMLResponse(INDEX_FILE.read_text(encoding="utf-8"))
