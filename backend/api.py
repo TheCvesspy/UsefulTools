@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, root_validator
@@ -96,14 +96,15 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
 @app.post("/upload")
-async def upload_image(file: UploadFile = File(...)) -> dict:
+async def upload_image(request: Request, file: UploadFile = File(...)) -> dict:
     """Store an uploaded image locally and return the public URL."""
 
     suffix = Path(file.filename).suffix or ".bin"
     destination = UPLOAD_DIR / f"{uuid.uuid4().hex}{suffix}"
     contents = await file.read()
     destination.write_bytes(contents)
-    return {"url": f"/uploads/{destination.name}", "filename": file.filename}
+    url = request.url_for("uploads", path=destination.name)
+    return {"url": str(url), "filename": file.filename}
 
 
 @app.post("/measure", response_model=MeasurementResponse)

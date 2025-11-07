@@ -31,6 +31,7 @@ def upload_panel() -> rx.Component:
         border="1px dashed",
         padding="1.5em",
         border_radius="md",
+        disabled=MeasurementState.uploading,
     )
 
     unit_options = [choice[0] for choice in UNIT_CHOICES]
@@ -43,6 +44,27 @@ def upload_panel() -> rx.Component:
                 "Upload image",
                 on_click=MeasurementState.handle_upload(uploader.files),  # type: ignore[arg-type]
                 width="100%",
+                is_loading=MeasurementState.uploading,
+                loading_text="Uploading...",
+                is_disabled=MeasurementState.uploading,
+            ),
+            rx.cond(
+                MeasurementState.uploading,
+                rx.hstack(
+                    rx.spinner(size="sm"),
+                    rx.text("Uploading image...", font_size="sm"),
+                    spacing="2",
+                    align_items="center",
+                ),
+            ),
+            rx.cond(
+                MeasurementState.upload_error,
+                rx.alert(
+                    rx.alert_icon(),
+                    rx.alert_title("Upload failed"),
+                    rx.alert_description(MeasurementState.upload_error),
+                    status="error",
+                ),
             ),
             rx.form_control(
                 rx.form_label("Units"),
@@ -82,6 +104,15 @@ def upload_panel() -> rx.Component:
                     on_change=MeasurementState.update_units_per_pixel,  # type: ignore[arg-type]
                 ),
                 rx.form_helper_text("Adjust this value to fine-tune measurements."),
+            ),
+            rx.cond(
+                MeasurementState.measurement_error,
+                rx.alert(
+                    rx.alert_icon(),
+                    rx.alert_title("Measurement error"),
+                    rx.alert_description(MeasurementState.measurement_error),
+                    status="error",
+                ),
             ),
             rx.button(
                 "Reset", on_click=MeasurementState.reset_measurements, variant="outline"
