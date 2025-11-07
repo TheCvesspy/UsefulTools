@@ -36,7 +36,7 @@ def _setup_card() -> rx.Component:
 
     return rx.card(
         rx.vstack(
-            rx.heading("Setup", size="md"),
+            rx.heading("Setup", size="md", width="100%"),
             uploader,
             rx.button(
                 "Upload image",
@@ -125,13 +125,27 @@ def _setup_card() -> rx.Component:
 def _results_card() -> rx.Component:
     return rx.card(
         rx.vstack(
-            rx.heading("Results", size="md"),
+            rx.heading("Results", size="md", width="100%"),
             rx.form_control(
                 rx.form_label("Measured distance"),
                 rx.input(
                     value=MeasurementState.measured_distance_display,
                     is_read_only=True,
                     variant="filled",
+                    width="100%",
+                ),
+            ),
+            rx.cond(
+                MeasurementState.measurement_result,
+                rx.text(
+                    "Distance reflects the most recent path measurement.",
+                    font_size="xs",
+                    color="gray.500",
+                ),
+                rx.text(
+                    "Measure a path to populate the result.",
+                    font_size="xs",
+                    color="gray.500",
                 ),
             ),
             spacing="4",
@@ -149,4 +163,5 @@ def upload_panel() -> rx.Component:
         _results_card(),
         spacing="4",
         width="100%",
+        align_items="stretch",
     )
