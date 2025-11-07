@@ -105,17 +105,49 @@ def upload_panel() -> rx.Component:
                 ),
                 rx.form_helper_text("Adjust this value to fine-tune measurements."),
             ),
-            rx.cond(
-                MeasurementState.measurement_error,
-                rx.alert(
-                    rx.alert_icon(),
-                    rx.alert_title("Measurement error"),
-                    rx.alert_description(MeasurementState.measurement_error),
-                    status="error",
-                ),
-            ),
             rx.button(
                 "Reset", on_click=MeasurementState.reset_measurements, variant="outline"
+            ),
+            rx.divider(),
+            rx.vstack(
+                rx.heading("Results", size="md"),
+                rx.cond(
+                    MeasurementState.measuring,
+                    rx.hstack(
+                        rx.spinner(size="sm"),
+                        rx.text("Calculating measurement...", font_size="sm"),
+                        spacing="2",
+                        align_items="center",
+                    ),
+                    rx.cond(
+                        MeasurementState.measurement_error,
+                        rx.alert(
+                            rx.alert_icon(),
+                            rx.alert_title("Measurement error"),
+                            rx.alert_description(MeasurementState.measurement_error),
+                            status="error",
+                        ),
+                        rx.vstack(
+                            rx.text(
+                                "Measurement total",
+                                font_size="sm",
+                                color="gray.500",
+                                text_transform="uppercase",
+                                letter_spacing="wider",
+                            ),
+                            rx.text(
+                                MeasurementState.formatted_total,
+                                font_size="lg",
+                                font_weight="bold",
+                            ),
+                            spacing="1",
+                            align_items="flex-start",
+                        ),
+                    ),
+                ),
+                spacing="3",
+                align_items="flex-start",
+                width="100%",
             ),
             spacing="4",
             width="100%",
