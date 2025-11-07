@@ -40,14 +40,22 @@ body {
   display: grid;
   gap: 1.5rem;
   padding: 0 1.5rem 2rem;
-  grid-template-columns: minmax(320px, 380px) 1fr;
+  grid-template-columns: minmax(280px, 340px) minmax(280px, 340px) minmax(0, 1fr);
+  grid-template-areas: "setup results canvas";
   align-items: start;
 }
 
-.control-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+.setup-panel {
+  grid-area: setup;
+}
+
+.results-panel {
+  grid-area: results;
+  gap: 0.75rem;
+}
+
+.canvas-section {
+  grid-area: canvas;
 }
 
 .panel,
@@ -69,10 +77,6 @@ body {
   margin: 0 0 0.75rem;
   font-size: 1.25rem;
   color: #0f172a;
-}
-
-.results-panel {
-  gap: 0.75rem;
 }
 
 .results-panel .status-message {
@@ -266,13 +270,22 @@ button:not(:disabled):hover {
   font-size: 0.95rem;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1200px) {
+  .app-layout {
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    grid-template-areas:
+      "setup canvas"
+      "results canvas";
+  }
+}
+
+@media (max-width: 900px) {
   .app-layout {
     grid-template-columns: 1fr;
-  }
-
-  .control-stack {
-    order: -1;
+    grid-template-areas:
+      "setup"
+      "results"
+      "canvas";
   }
 }
 
