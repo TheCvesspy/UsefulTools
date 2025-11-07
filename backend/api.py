@@ -6,19 +6,79 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, root_validator
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from pydantic import BaseModel, Field, model_validator
 
 from .geometry import can_close_loop, compute_measurements
 from .persistence import SessionStore
 
-UPLOAD_DIR = Path(__file__).resolve().parent / "uploads"
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent
+
+UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-STORE_PATH = Path(__file__).resolve().parent / "data" / "sessions.json"
+STORE_PATH = BASE_DIR / "data" / "sessions.json"
 _session_store = SessionStore(STORE_PATH)
+
+FRONTEND_BUILD_DIR = PROJECT_ROOT / "webapp" / ".web"
+
+
+def _find_frontend_index() -> Optional[Path]:
+    """Return the bundled Reflex index page if one is available."""
+
+    if not FRONTEND_BUILD_DIR.exists():
+        return None
+
+    candidates = [
+        FRONTEND_BUILD_DIR / "_static" / "index.html",
+        FRONTEND_BUILD_DIR / "pages" / "index.html",
+        FRONTEND_BUILD_DIR / "index.html",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _frontend_fallback_html() -> str:
+    """Return a helpful HTML landing page when the UI build is missing."""
+
+    return """
+    <!DOCTYPE html>
+    <html lang=\"en\">
+      <head>
+        <meta charset=\"utf-8\" />
+        <title>Useful Tools API</title>
+        <style>
+          body { font-family: system-ui, sans-serif; margin: 3rem auto; max-width: 640px; line-height: 1.6; color: #1f2933; }
+          h1 { font-size: 2rem; margin-bottom: 1rem; }
+          p { margin-bottom: 1rem; }
+          code, pre { background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 0.25rem; }
+          a { color: #2563eb; }
+        </style>
+      </head>
+      <body>
+        <h1>Useful Tools backend is running</h1>
+        <p>This server powers the image measurement UI. The interactive interface is built with Reflex and can be launched separately with <code>reflex run</code>.</p>
+        <p>If you only need to explore the API, head over to the <a href=\"/docs\">OpenAPI documentation</a>.</p>
+        <p>To enable the web UI on this server, generate a Reflex build so that the static files appear under <code>webapp/.web</code> before starting the backend.</p>
+      </body>
+    </html>
+    """
+
+
+def _serve_frontend_index() -> HTMLResponse | FileResponse:
+    """Serve the built Reflex UI or the fallback landing page."""
+
+    frontend_index = _find_frontend_index()
+    if frontend_index and frontend_index.is_file():
+        return FileResponse(frontend_index)
+
+    return HTMLResponse(content=_frontend_fallback_html(), status_code=200)
 
 
 def get_store() -> SessionStore:
@@ -42,22 +102,22 @@ class ScalePayload(BaseModel):
         None, description="Pixel distance between the reference points."
     )
 
-    @root_validator
-    def validate_scale(cls, values):  # type: ignore[override]
-        units_per_pixel = values.get("units_per_pixel")
-        ref_distance = values.get("reference_distance")
-        ref_pixels = values.get("reference_pixel_length")
+    @model_validator(mode="after")
+    def validate_scale(self):
+        units_per_pixel = self.units_per_pixel
+        ref_distance = self.reference_distance
+        ref_pixels = self.reference_pixel_length
         if units_per_pixel is not None:
-            return values
+            return self
         if ref_distance is not None and ref_pixels not in {None, 0}:
-            values["units_per_pixel"] = ref_distance / ref_pixels
-            return values
-        if values.get("unit_name") != "px":
+            self.units_per_pixel = ref_distance / ref_pixels
+            return self
+        if self.unit_name != "px":
             raise ValueError(
                 "Provide either 'units_per_pixel' or both 'reference_distance' and "
                 "'reference_pixel_length' for non-pixel units."
             )
-        return values
+        return self
 
 
 class MeasurePayload(BaseModel):
@@ -70,11 +130,11 @@ class MeasurePayload(BaseModel):
         description="Persist the request/response payload when a session identifier is provided.",
     )
 
-    @root_validator
-    def validate_points(cls, values):  # type: ignore[override]
-        if values.get("closed") and not can_close_loop(values.get("points", [])):
+    @model_validator(mode="after")
+    def validate_points(self):
+        if self.closed and not can_close_loop(self.points):
             raise ValueError("At least three points are required to close a path.")
-        return values
+        return self
 
 
 class MeasurementResponse(BaseModel):
@@ -93,6 +153,18 @@ app.add_middleware(
 )
 
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+
+_STATIC_MOUNT_CANDIDATES: list[tuple[str, Path]] = [
+    ("/_next", FRONTEND_BUILD_DIR / "_next"),
+    ("/static", FRONTEND_BUILD_DIR / "static"),
+    ("/assets", FRONTEND_BUILD_DIR / "assets"),
+    ("/public", FRONTEND_BUILD_DIR / "public"),
+    ("/_static", FRONTEND_BUILD_DIR / "_static"),
+]
+
+for mount_path, directory in _STATIC_MOUNT_CANDIDATES:
+    if directory.is_dir():
+        app.mount(mount_path, StaticFiles(directory=str(directory)), name=f"frontend-{mount_path.strip('/')}")
 
 
 @app.post("/upload")
@@ -124,9 +196,9 @@ def measure_points(payload: MeasurePayload, store: SessionStore = Depends(get_st
         store.save_session(
             payload.session_id,
             {
-                "points": [point.dict() for point in payload.points],
+                "points": [point.model_dump() for point in payload.points],
                 "closed": payload.closed,
-                "scale": payload.scale.dict(),
+                "scale": payload.scale.model_dump(),
                 "measurement": measurement.to_dict(),
             },
         )
@@ -145,3 +217,25 @@ def get_session(session_id: str, store: SessionStore = Depends(get_store)) -> di
 @app.get("/sessions")
 def list_sessions(store: SessionStore = Depends(get_store)) -> dict:
     return {"sessions": store.list_sessions()}
+
+
+@app.get("/", include_in_schema=False)
+def serve_frontend_root() -> HTMLResponse | FileResponse:
+    """Serve the bundled Reflex front-end or display a helpful welcome page."""
+
+    return _serve_frontend_index()
+
+
+@app.exception_handler(HTTPException)
+async def _http_exception_handler(request: Request, exc: HTTPException):
+    """Provide a helpful UI fallback when the root path returns 404."""
+
+    if (
+        exc.status_code == status.HTTP_404_NOT_FOUND
+        and request.method in {"GET", "HEAD"}
+        and request.url.path in {"", "/", "/index.html"}
+    ):
+        # Re-serve the frontend landing page when the router does not match the root path.
+        return _serve_frontend_index()
+
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
