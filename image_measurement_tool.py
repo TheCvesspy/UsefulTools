@@ -1,6 +1,5 @@
 """Interactive image measurement tool with scaling and path tracing."""
 
-import math
 from pathlib import Path
 from typing import List, Optional
 
@@ -24,6 +23,15 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+)
+
+from backend.geometry import (
+    UNIT_CHOICES as GEOMETRY_UNIT_CHOICES,
+    can_close_loop,
+    compute_measurements,
+    distance_between_points,
+    display_unit_name as geometry_display_unit_name,
+    unit_choice_label as geometry_unit_choice_label,
 )
 
 
@@ -102,13 +110,7 @@ class MeasurementScene(QGraphicsScene):
 class MeasurementWindow(QMainWindow):
     SCALE_POINT_COLOR = Qt.red
     PATH_COLOR = Qt.green
-    UNIT_CHOICES = [
-        ("px", "px"),
-        ("mm", "mm"),
-        ("cm", "cm"),
-        ("km", "km"),
-        ("mi", "miles (mi)"),
-    ]
+    UNIT_CHOICES = list(GEOMETRY_UNIT_CHOICES)
 
     def __init__(self):
         super().__init__()
@@ -252,7 +254,7 @@ class MeasurementWindow(QMainWindow):
         self.scale_markers.append(marker)
         self.scale_points.append(point)
         if len(self.scale_points) == 2:
-            distance_pixels = self.distance(self.scale_points[0], self.scale_points[1])
+            distance_pixels = distance_between_points(self.scale_points[0], self.scale_points[1])
             if distance_pixels == 0:
                 QMessageBox.warning(self, "Invalid scale", "Selected points are identical. Try again.")
                 self.reset_scale_items()
@@ -270,7 +272,7 @@ class MeasurementWindow(QMainWindow):
                 self.draw_scale_line()
                 self.mode = "idle"
                 self.status_label.setText(
-                    f"Scale set: {value:.4f} {self.unit_choice_label()} over {distance_pixels:.2f} pixels. Trace a path to measure."
+                    f"Scale set: {value:.4f} {geometry_unit_choice_label(self.unit_name)} over {distance_pixels:.2f} pixels. Trace a path to measure."
                 )
                 self.update_distance_label()
             else:
@@ -349,47 +351,42 @@ class MeasurementWindow(QMainWindow):
     def update_distance_label(self):
         if len(self.path_points) < 2:
             if self.unit_name == "px" or self.units_per_pixel is not None:
-                label_unit = self.display_unit_name()
+                label_unit = geometry_display_unit_name(self.unit_name)
                 self.total_label.setText(f"Distance: 0 {label_unit}")
             else:
                 self.total_label.setText(
                     "Distance: 0 px (set scale to convert to selected units)"
                 )
             return
-        total_pixels = 0.0
-        for start, end in zip(self.path_points[:-1], self.path_points[1:]):
-            total_pixels += self.distance(start, end)
-        if self.path_closed and len(self.path_points) >= 3:
-            total_pixels += self.distance(self.path_points[-1], self.path_points[0])
-            area_pixels = self.polygon_area(self.path_points)
-        else:
-            area_pixels = 0.0
 
-        unit_multiplier = self.get_unit_multiplier()
-        if unit_multiplier is not None:
-            total_units = total_pixels * unit_multiplier
-            distance_text = f"{total_units:.4f} {self.display_unit_name()}"
+        measurement = compute_measurements(
+            self.path_points,
+            closed=self.path_closed,
+            unit_name=self.unit_name,
+            units_per_pixel=self.units_per_pixel,
+        )
+
+        if measurement.unit_multiplier is not None and measurement.total_units is not None:
+            distance_text = f"{measurement.total_units:.4f} {measurement.display_unit_name}"
+            secondary_km = measurement.secondary_distances.get("km")
+            if secondary_km is not None:
+                distance_text += f" ({secondary_km:.4f} km)"
             area_text = ""
-            if self.unit_name == "mi":
-                km_value = total_units * 1.60934
-                distance_text += f" ({km_value:.4f} km)"
-            if self.path_closed and len(self.path_points) >= 3:
-                area_units = area_pixels * (unit_multiplier ** 2)
-                area_unit_label = f"{self.display_unit_name()}²"
-                area_text = f" | Area: {area_units:.4f} {area_unit_label}"
-                if self.unit_name == "mi":
-                    km_area = area_units * (1.60934 ** 2)
-                    area_text += f" ({km_area:.4f} km²)"
-            prefix = "Perimeter" if self.path_closed and len(self.path_points) >= 3 else "Distance"
+            if measurement.closed and measurement.area_units is not None:
+                area_text = f" | Area: {measurement.area_units:.4f} {measurement.display_unit_name}²"
+                secondary_area = measurement.secondary_areas.get("km²")
+                if secondary_area is not None:
+                    area_text += f" ({secondary_area:.4f} km²)"
+            prefix = "Perimeter" if measurement.closed else "Distance"
             self.total_label.setText(f"{prefix}: {distance_text}{area_text}")
         else:
-            distance_text = f"{total_pixels:.2f} px"
+            distance_text = f"{measurement.total_pixels:.2f} px"
             if self.unit_name != "px":
-                distance_text += f" (set scale for {self.display_unit_name()})"
-            if self.path_closed and len(self.path_points) >= 3:
-                area_text = f" | Area: {area_pixels:.2f} px²"
+                distance_text += f" (set scale for {measurement.display_unit_name})"
+            if measurement.closed and measurement.area_pixels:
+                area_text = f" | Area: {measurement.area_pixels:.2f} px²"
                 if self.unit_name != "px":
-                    area_text += f" (set scale for {self.display_unit_name()}²)"
+                    area_text += f" (set scale for {measurement.display_unit_name}²)"
                 self.total_label.setText(f"Perimeter: {distance_text}{area_text}")
             else:
                 self.total_label.setText(f"Distance: {distance_text}")
@@ -494,26 +491,13 @@ class MeasurementWindow(QMainWindow):
             if display == selection:
                 self.unit_name = value
                 break
-        self.status_label.setText(f"Measurement units set to '{self.unit_choice_label()}'.")
+        self.status_label.setText(
+            f"Measurement units set to '{geometry_unit_choice_label(self.unit_name)}'."
+        )
         self.update_distance_label()
 
-    @staticmethod
-    def distance(start: QPointF, end: QPointF) -> float:
-        return math.hypot(start.x() - end.x(), start.y() - end.y())
-
-    @staticmethod
-    def polygon_area(points: List[QPointF]) -> float:
-        if len(points) < 3:
-            return 0.0
-        area = 0.0
-        for idx, point in enumerate(points):
-            next_point = points[(idx + 1) % len(points)]
-            area += point.x() * next_point.y()
-            area -= next_point.x() * point.y()
-        return abs(area) / 2.0
-
     def close_path_loop(self):
-        if len(self.path_points) < 3:
+        if not can_close_loop(self.path_points):
             QMessageBox.information(
                 self,
                 "Not enough points",
@@ -528,20 +512,6 @@ class MeasurementWindow(QMainWindow):
         self.update_distance_label()
         self.status_label.setText("Path closed. Perimeter and area calculated.")
 
-    def get_unit_multiplier(self) -> Optional[float]:
-        if self.unit_name == "px":
-            return 1.0
-        return self.units_per_pixel
-
-    def display_unit_name(self) -> str:
-        return "mi" if self.unit_name == "mi" else self.unit_name
-
-    def unit_choice_label(self, value: Optional[str] = None) -> str:
-        value = value or self.unit_name
-        for unit_value, display in self.UNIT_CHOICES:
-            if unit_value == value:
-                return display
-        return value
 
 
 def main():
