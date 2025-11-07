@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, model_validator
 
 from .geometry import can_close_loop, compute_measurements
 from .persistence import SessionStore
@@ -42,22 +42,22 @@ class ScalePayload(BaseModel):
         None, description="Pixel distance between the reference points."
     )
 
-    @root_validator
-    def validate_scale(cls, values):  # type: ignore[override]
-        units_per_pixel = values.get("units_per_pixel")
-        ref_distance = values.get("reference_distance")
-        ref_pixels = values.get("reference_pixel_length")
+    @model_validator(mode="after")
+    def validate_scale(self):
+        units_per_pixel = self.units_per_pixel
+        ref_distance = self.reference_distance
+        ref_pixels = self.reference_pixel_length
         if units_per_pixel is not None:
-            return values
+            return self
         if ref_distance is not None and ref_pixels not in {None, 0}:
-            values["units_per_pixel"] = ref_distance / ref_pixels
-            return values
-        if values.get("unit_name") != "px":
+            self.units_per_pixel = ref_distance / ref_pixels
+            return self
+        if self.unit_name != "px":
             raise ValueError(
                 "Provide either 'units_per_pixel' or both 'reference_distance' and "
                 "'reference_pixel_length' for non-pixel units."
             )
-        return values
+        return self
 
 
 class MeasurePayload(BaseModel):
@@ -70,11 +70,11 @@ class MeasurePayload(BaseModel):
         description="Persist the request/response payload when a session identifier is provided.",
     )
 
-    @root_validator
-    def validate_points(cls, values):  # type: ignore[override]
-        if values.get("closed") and not can_close_loop(values.get("points", [])):
+    @model_validator(mode="after")
+    def validate_points(self):
+        if self.closed and not can_close_loop(self.points):
             raise ValueError("At least three points are required to close a path.")
-        return values
+        return self
 
 
 class MeasurementResponse(BaseModel):
@@ -124,9 +124,9 @@ def measure_points(payload: MeasurePayload, store: SessionStore = Depends(get_st
         store.save_session(
             payload.session_id,
             {
-                "points": [point.dict() for point in payload.points],
+                "points": [point.model_dump() for point in payload.points],
                 "closed": payload.closed,
-                "scale": payload.scale.dict(),
+                "scale": payload.scale.model_dump(),
                 "measurement": measurement.to_dict(),
             },
         )
