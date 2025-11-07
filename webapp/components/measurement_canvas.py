@@ -143,6 +143,8 @@ def measurement_canvas() -> rx.Component:
         ),
         spacing="3",
         wrap="wrap",
+        width="100%",
+        justify="flex-start",
     )
 
     return rx.vstack(

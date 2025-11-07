@@ -15,24 +15,23 @@ def index() -> rx.Component:
             "Upload an image, define a scale, and trace paths to compute real-world distances.",
             color="gray.500",
         ),
-        rx.flex(
+        rx.grid(
             rx.box(
                 upload_panel(),
                 width="100%",
-                max_width=["100%", "100%", "28rem", "32rem"],
-                flex_basis=["100%", "100%", "33.333%", "33.333%"],
-                flex_shrink=0,
             ),
             rx.box(
                 measurement_canvas(),
                 width="100%",
-                flex="1",
-                min_width=0,
             ),
-            direction=["column", "column", "row"],
-            align="stretch",
+            template_columns=[
+                "1fr",
+                "1fr",
+                "minmax(20rem, 1fr) 2fr",
+            ],
             gap="6",
             width="100%",
+            align_items="stretch",
         ),
         status_bar(),
         spacing="6",
