@@ -64,15 +64,15 @@ function formatDistance() {
       state.measurement.unit_name ||
       state.unitName;
     if (typeof state.measurement.total_units === "number") {
-      return `Distance: ${state.measurement.total_units.toFixed(2)} ${displayUnit}`;
+      return `${state.measurement.total_units.toFixed(2)} ${displayUnit}`;
     }
     if (typeof state.measurement.total_pixels === "number") {
-      return `Distance: ${state.measurement.total_pixels.toFixed(2)} px`;
+      return `${state.measurement.total_pixels.toFixed(2)} px`;
     }
   }
   const unit = state.unitName || "px";
   const value = typeof state.totalDistance === "number" ? state.totalDistance : 0;
-  return `Distance: ${value.toFixed(2)} ${unit}`;
+  return `${value.toFixed(2)} ${unit}`;
 }
 
 function distance(a, b) {
@@ -152,7 +152,8 @@ function updateUI() {
   const hasImage = Boolean(state.imageUrl);
 
   elements.instructions.textContent = state.instructions;
-  elements.measurementTotal.textContent = formatDistance();
+  elements.measurementTotal.value = formatDistance();
+  elements.measurementStatus.classList.toggle("loading", state.measuring);
 
   elements.scaleButton.classList.toggle("active", state.mode === "scale");
   elements.pathButton.classList.toggle("active", state.mode === "path");
