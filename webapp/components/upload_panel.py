@@ -150,10 +150,9 @@ def upload_panel() -> rx.Component:
         width="100%",
     )
 
-    return rx.responsive_grid(
+    return rx.vstack(
         setup_card,
         results_card,
-        columns=[1, 1, 1],
         spacing="4",
         width="100%",
     )

@@ -41,18 +41,18 @@ body {
   gap: 1.5rem;
   padding: 0 1.5rem 2rem;
   grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
-  grid-template-areas:
-    "setup canvas"
-    "results canvas";
+  grid-template-areas: "controls canvas";
   align-items: start;
 }
 
-.setup-panel {
-  grid-area: setup;
+.control-stack {
+  grid-area: controls;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .results-panel {
-  grid-area: results;
   gap: 0.75rem;
 }
 
@@ -282,8 +282,7 @@ button:not(:disabled):hover {
   .app-layout {
     grid-template-columns: 1fr;
     grid-template-areas:
-      "setup"
-      "results"
+      "controls"
       "canvas";
   }
 }
