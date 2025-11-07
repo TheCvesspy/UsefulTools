@@ -6,7 +6,7 @@ from ..state import MeasurementState
 
 
 def status_bar() -> rx.Component:
-    """Display measurement instructions and totals."""
+    """Display measurement instructions and theme toggle."""
 
     mode_icon = rx.cond(
         MeasurementState.mode == "scale",
@@ -24,24 +24,6 @@ def status_bar() -> rx.Component:
         rx.icon("moon"),
     )
 
-    measurement_badge = rx.cond(
-        MeasurementState.measurement_error,
-        rx.badge(
-            MeasurementState.measurement_error,
-            color_scheme="red",
-        ),
-        rx.cond(
-            MeasurementState.measuring,
-            rx.hstack(
-                rx.spinner(size="xs"),
-                rx.text("Calculating…", font_size="sm"),
-                spacing="2",
-                align_items="center",
-            ),
-            rx.badge(MeasurementState.formatted_total, color_scheme="green"),
-        ),
-    )
-
     return rx.hstack(
         rx.hstack(
             mode_icon,
@@ -52,7 +34,6 @@ def status_bar() -> rx.Component:
             spacing="2",
         ),
         rx.spacer(),
-        measurement_badge,
         rx.icon_button(
             icon=theme_icon,
             aria_label="Toggle theme",
