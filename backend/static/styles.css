@@ -40,8 +40,14 @@ body {
   display: grid;
   gap: 1.5rem;
   padding: 0 1.5rem 2rem;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: minmax(320px, 380px) 1fr;
   align-items: start;
+}
+
+.control-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .panel,
@@ -258,6 +264,16 @@ button:not(:disabled):hover {
 
 .status-bar #instructions {
   font-size: 0.95rem;
+}
+
+@media (max-width: 960px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .control-stack {
+    order: -1;
+  }
 }
 
 @media (max-width: 768px) {
