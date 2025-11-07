@@ -7,6 +7,7 @@ import httpx
 import reflex as rx
 
 from rxconfig import config as app_config
+from ..core import AppState
 
 
 class Point(rx.Base):
@@ -60,7 +61,7 @@ def _extract_error_message(response: Optional[httpx.Response], fallback: str) ->
     return f"{response.status_code} {response.reason_phrase}"
 
 
-class MeasurementState(rx.State):
+class MeasurementState(AppState):
     """Global application state mirroring the PyQt behaviour."""
 
     api_base_url: str = _normalise_base_url(getattr(app_config, "api_url", ""))
@@ -69,7 +70,6 @@ class MeasurementState(rx.State):
     unit_name: str = "px"
     units_per_pixel: float = 1.0
     total_distance: float = 0.0
-    dark_mode: bool = False
     scale_points: List[Point] = []
     path_points: List[Point] = []
     path_closed: bool = False
@@ -195,9 +195,6 @@ class MeasurementState(rx.State):
 
         resolved_url = _normalise_image_url(self.api_base_url, image_url)
         yield MeasurementState._complete_upload(resolved_url, filename)
-
-    def toggle_theme(self):
-        self.dark_mode = not self.dark_mode
 
     def start_scale_mode(self):
         self.mode = "scale"
